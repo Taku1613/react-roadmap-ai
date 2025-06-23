@@ -1,0 +1,1766 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>インタラクティブReact学習ロードマップ (AIアシスタント搭載)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Chosen Palette: Warm Harmony (Beige/Gray/Muted Teal) -->
+    <!-- 
+      Application Structure Plan: 
+      このSPAは、元のレポートの線形的な構造を、インタラクティブなダッシュボード形式に再設計します。主な構造は以下の通りです。
+      1. **ヘッダーナビゲーション**: レポートの4つの主要パートに即座にアクセスできます。
+      2. **統計ダッシュボード**: 学習ロードマップ全体の構成（難易度別、パート別）を視覚的に示すチャートを配置します。これによりユーザーは全体の構造を直感的に把握できます。
+      3. **インタラクティブなプロジェクトグリッド**: 100個のプロジェクトをカード形式で表示します。このカードレイアウトは、巨大なテーブルよりも視覚的に魅力的で、スキャンしやすいです。
+      4. **フィルタリングと検索**: ユーザーは難易度やキーワードでプロジェクトを絞り込むことができ、自分のニーズに合った学習項目を簡単に見つけられます。
+      5. **モーダルによる詳細表示**: プロジェクトカードをクリックすると、詳細情報（製造のヒント、学習の詳細）がモーダルウィンドウで表示されます。これにより、ページ遷移なく情報を深く掘り下げることができ、コンテキストの喪失を防ぎます。
+      6. **進捗管理機能**: 各プロジェクトに「完了」マークを付けることができます。この状態はブラウザの`localStorage`に保存され、ユーザーの学習進捗を永続的に追跡します。これは学習のモチベーションを維持するために重要な機能です。
+      7. **✨ AI学習アシスタント (Gemini API連携)**: 各プロジェクトのモーダル内に、AIによる支援機能を統合。「プロジェクトの分解」や「コンセプトの深掘り」をAIに質問でき、より能動的な学習を促進します。
+      この構造は、静的なレポートを動的な学習ツールへと昇華させ、ユーザーが能動的に情報を探索し、自身の学習パスを管理できるようにするために選択されました。
+    -->
+    <!-- 
+      Visualization & Content Choices:
+      - **レポート情報**: 100個のプロジェクトリスト -> **ゴール**: 整理・探索 -> **表示方法**: カードグリッド -> **インタラクション**: フィルタ、検索、クリック -> **正当化**: 長大なリストを扱いやすくする -> **方法**: HTML/Tailwind/JS
+      - **レポート情報**: プロジェクト詳細 -> **ゴール**: 詳細情報提供 -> **表示方法**: モーダルウィンドウ -> **インタラクション**: 開く/閉じる -> **正当化**: 画面をクリーンに保ち、情報に集中させる -> **方法**: HTML/Tailwind/JS
+      - **レポート情報**: AIによる学習支援 -> **ゴール**: 学習深化・問題解決 -> **表示方法**: モーダル内の専用エリア -> **インタラクション**: ボタンクリックでAIに質問 -> **正当化**: 学習者の疑問に即応し、学習効率を向上 -> **方法**: Gemini API (JS Fetch)
+      - **レポート情報**: プロジェクトの難易度分布 -> **ゴール**: 比較・情報提供 -> **表示方法**: ドーナツチャート -> **インタラクション**: ホバー -> **正当化**: ロードマップの難易度構成を一覧させる -> **方法**: Chart.js (Canvas)
+      - **レポート情報**: パートごとのプロジェクト数 -> **ゴール**: 比較・情報提供 -> **表示方法**: バーチャート -> **インタラクション**: ホバー -> **正当化**: 各学習フェーズの比重を視覚化する -> **方法**: Chart.js (Canvas)
+      - **レポート情報**: 学習の進捗 -> **ゴール**: 動機付け・追跡 -> **表示方法**: カード上のチェックマーク -> **インタラクション**: クリックで完了状態を切り替え -> **正当化**: 学習の達成感を高める -> **方法**: JS + localStorage
+      - **CONFIRMATION: NO SVG graphics used. NO Mermaid JS used.**
+    -->
+    <style>
+      body {
+        background-color: #fdfcf9;
+        color: #3f3f46;
+        font-family: "Hiragino Kaku Gothic ProN", "Meiryo", sans-serif;
+      }
+      .chart-container {
+        position: relative;
+        width: 100%;
+        max-width: 400px;
+        margin-left: auto;
+        margin-right: auto;
+        height: 300px;
+        max-height: 350px;
+      }
+      @media (min-width: 768px) {
+        .chart-container {
+          height: 350px;
+        }
+      }
+      .nav-link {
+        transition: all 0.3s ease;
+        border-bottom: 2px solid transparent;
+      }
+      .nav-link.active,
+      .nav-link:hover {
+        border-bottom-color: #14b8a6;
+        color: #0f766e;
+      }
+      .project-card {
+        transition: all 0.2s ease-in-out;
+      }
+      .project-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1),
+          0 4px 6px -4px rgb(0 0 0 / 0.1);
+      }
+      .project-card.completed {
+        background-color: #f0fdfa;
+        border-left: 4px solid #14b8a6;
+      }
+      .modal-overlay {
+        transition: opacity 0.3s ease;
+      }
+      .modal-content {
+        transition: transform 0.3s ease;
+      }
+      .ai-response pre {
+        background-color: #e6f4f2;
+        border-radius: 0.5rem;
+        padding: 1rem;
+        overflow-x: auto;
+        font-size: 0.875rem;
+        line-height: 1.5;
+        color: #134e4a;
+      }
+      .ai-response code {
+        font-family: "Courier New", Courier, monospace;
+      }
+    </style>
+  </head>
+  <body class="antialiased">
+    <!-- Header -->
+    <header class="bg-white/80 backdrop-blur-lg sticky top-0 z-40 shadow-sm">
+      <div class="container mx-auto px-4">
+        <div class="flex items-center justify-between h-16">
+          <h1 class="text-xl md:text-2xl font-bold text-teal-800">
+            React学習ロードマップ
+          </h1>
+          <nav class="hidden md:flex space-x-6 text-sm" id="main-nav">
+            <a
+              href="#part-1"
+              data-part="1"
+              class="nav-link font-semibold text-gray-600"
+              >Part 1: 基礎</a
+            >
+            <a
+              href="#part-2"
+              data-part="2"
+              class="nav-link font-semibold text-gray-600"
+              >Part 2: API連携</a
+            >
+            <a
+              href="#part-3"
+              data-part="3"
+              class="nav-link font-semibold text-gray-600"
+              >Part 3: スケール</a
+            >
+            <a
+              href="#part-4"
+              data-part="4"
+              class="nav-link font-semibold text-gray-600"
+              >Part 4: プロ仕上げ</a
+            >
+          </nav>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="container mx-auto p-4 md:p-8">
+      <!-- Introduction -->
+      <section id="intro" class="mb-12 text-center">
+        <h2 class="text-3xl font-bold mb-4 text-gray-800">
+          React習得への道へようこそ
+        </h2>
+        <p class="max-w-3xl mx-auto text-gray-600">
+          このインタラクティブなロードマップは、Reactを体系的に学ぶための100のプロジェクトをガイドします。各プロジェクトは、基礎から応用まで、あなたのスキルを段階的に向上させるように設計されています。チャートをクリックしたり、プロジェクトを検索して、あなたの学習の旅を始めましょう。
+        </p>
+      </section>
+
+      <!-- Dashboard -->
+      <section id="dashboard" class="mb-12">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <div class="bg-white p-6 rounded-xl shadow-md">
+            <h3 class="text-xl font-bold text-center mb-4 text-gray-700">
+              プロジェクトの難易度分布
+            </h3>
+            <div class="chart-container">
+              <canvas id="difficultyChart"></canvas>
+            </div>
+          </div>
+          <div class="bg-white p-6 rounded-xl shadow-md">
+            <h3 class="text-xl font-bold text-center mb-4 text-gray-700">
+              パート別プロジェクト数
+            </h3>
+            <div class="chart-container">
+              <canvas id="partChart"></canvas>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Controls -->
+      <section
+        id="controls"
+        class="mb-8 p-4 bg-white rounded-xl shadow-md sticky top-[65px] z-30"
+      >
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
+          <div>
+            <label
+              for="difficulty-filter"
+              class="block text-sm font-medium text-gray-700 mb-1"
+              >難易度で絞り込む</label
+            >
+            <select
+              id="difficulty-filter"
+              class="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-teal-500 focus:border-teal-500"
+            >
+              <option value="all">すべて</option>
+              <option value="初級">初級</option>
+              <option value="中級">中級</option>
+              <option value="上級">上級</option>
+            </select>
+          </div>
+          <div class="md:col-span-2">
+            <label
+              for="search-input"
+              class="block text-sm font-medium text-gray-700 mb-1"
+              >キーワードで検索</label
+            >
+            <input
+              type="text"
+              id="search-input"
+              placeholder="例: ToDo, API, Redux..."
+              class="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-teal-500 focus:border-teal-500"
+            />
+          </div>
+        </div>
+      </section>
+
+      <!-- Dynamic Content Section -->
+      <div id="dynamic-content">
+        <div
+          id="part-description"
+          class="mb-6 bg-teal-50 border-l-4 border-teal-500 text-teal-800 p-4 rounded-r-lg"
+        ></div>
+        <div
+          id="project-grid"
+          class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
+        >
+          <!-- Project cards will be injected here -->
+        </div>
+      </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="text-center p-6 mt-12 text-gray-500 text-sm">
+      <p>
+        このロードマップは「React習得への道：100のアプリケーションで学ぶ実践ロードマップ」レポートを基に作成されました。
+      </p>
+    </footer>
+
+    <!-- Modal -->
+    <div
+      id="modal"
+      class="modal-overlay fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4 opacity-0 pointer-events-none"
+    >
+      <div
+        id="modal-content"
+        class="modal-content bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto transform scale-95"
+      >
+        <!-- Modal content will be injected here -->
+      </div>
+    </div>
+
+    <script>
+      const projects = [
+        {
+          id: 1,
+          part: 1,
+          name: '"Hello World" コンポーネント',
+          difficulty: "初級",
+          focus: "コンポーネントの基本構造",
+          concepts: "JSX, React Component",
+          hint: "`npx create-react-app`でプロジェクトを作成し、`src/App.js`を編集します。JSXの基本構文を理解することが目標です。",
+          learn:
+            "Reactコンポーネントの基本構造と、ブラウザにレンダリングされるまでのプロセスを学びます。",
+        },
+        {
+          id: 2,
+          part: 1,
+          name: "自己紹介カード",
+          difficulty: "初級",
+          focus: "JSXとスタイリング",
+          concepts: "JSX, CSS",
+          hint: "名前、趣味、スキルなどの情報を持つコンポーネントを作成します。インラインスタイルや外部CSSファイルを使って見た目を整えましょう。",
+          learn:
+            "JSXを使って構造的なUIを記述する方法と、Reactコンポーネントにスタイルを適用する基本的なテクニックを学びます。",
+        },
+        {
+          id: 3,
+          part: 1,
+          name: "再利用可能なボタンコンポーネント",
+          difficulty: "初級",
+          focus: "Propsによるコンポーネントの汎用化",
+          concepts: "Props, Event Handling",
+          hint: "コンポーネントに`text`や`onClick`といったpropsを定義します。親コンポーネントから異なる値を渡して、同じボタンを複数配置してみましょう。",
+          learn:
+            "`props`を通じてコンポーネントを動的かつ再利用可能にする方法と、イベントハンドラを`props`として渡すパターンを学びます。",
+        },
+        {
+          id: 4,
+          part: 1,
+          name: "ヘッダーコンポーネント",
+          difficulty: "初級",
+          focus: "コンポーネントの組み合わせ",
+          concepts: "Component Composition",
+          hint: "ロゴ、ナビゲーションリンク、検索バーなどの小さなコンポーネントを作成し、それらを一つの`Header`コンポーネントにまとめます。",
+          learn:
+            "小さなコンポーネントを組み合わせて、より大きなUI部品を構築する「コンポーネント合成」の考え方を理解します。",
+        },
+        {
+          id: 5,
+          part: 1,
+          name: "プロジェクトカードコンポーネント",
+          difficulty: "初級",
+          focus: "コンポーネントの組み合わせ",
+          concepts: "Component Composition, Props",
+          hint: "プロジェクトの画像、タイトル、説明文を表示するカードを作成します。これらのデータはpropsとして受け取るように設計します。",
+          learn:
+            "`props`を使ってデータを受け取り、それを元にUIを構築する実践的なコンポーネント作成スキルを習得します。",
+        },
+        {
+          id: 6,
+          part: 1,
+          name: "ポートフォリオページ",
+          difficulty: "初級",
+          focus: "データからUIを生成",
+          concepts: ".map(), List Rendering",
+          hint: "プロジェクトのデータ配列を用意し、`.map()`メソッドを使って各プロジェクトの`プロジェクトカード`コンポーネントを動的に生成します。",
+          learn:
+            "JavaScriptの配列メソッドを使って、データコレクションからReact要素のリストを効率的にレンダリングする方法を学びます。",
+        },
+        {
+          id: 7,
+          part: 1,
+          name: "履歴書ビルダーUI（静的）",
+          difficulty: "初級",
+          focus: "大規模なコンポーネント構成",
+          concepts: "Component Composition",
+          hint: "学歴、職歴、スキルなど、セクションごとにコンポーネントを分割して作成し、それらを組み合わせて全体のページを構築します。",
+          learn:
+            "複雑なUIを管理可能な小さなコンポーネントに分割し、それらを体系的に組み立てる設計スキルを養います。",
+        },
+        {
+          id: 8,
+          part: 1,
+          name: "ブログレイアウト（静的）",
+          difficulty: "初級",
+          focus: "一般的なWebレイアウト",
+          concepts: "Component Composition",
+          hint: "ヘッダー、サイドバー、記事エリア、フッターといった典型的なブログレイアウトを、コンポーネントの組み合わせで実現します。",
+          learn:
+            "Webアプリケーションで頻繁に見られるレイアウトパターンを、Reactのコンポーネントモデルで実装する方法を学びます。",
+        },
+        {
+          id: 9,
+          part: 1,
+          name: "カウンターアプリ",
+          difficulty: "初級",
+          focus: "コンポーネントの状態管理",
+          concepts: "useState Hook",
+          hint: "`useState`フックで数値の状態を保持します。ボタンの`onClick`イベントで、状態を更新する関数（セッター関数）を呼び出します。",
+          learn:
+            "Reactで最も重要なフックである`useState`を使い、コンポーネントが自身の状態を記憶し、ユーザー操作に応じてUIを更新する仕組みを学びます。",
+        },
+        {
+          id: 10,
+          part: 1,
+          name: "ToDoリスト V1 (項目追加)",
+          difficulty: "初級",
+          focus: "配列の状態管理とフォーム",
+          concepts: "useState, Controlled Components",
+          hint: "入力値を保持するstateと、ToDoリストを保持するstateの2つを使用します。フォーム送信時にスプレッド構文で配列を更新します。",
+          learn:
+            "配列のstate管理、制御されたコンポーネント、フォームの基本を学びます。",
+        },
+        {
+          id: 11,
+          part: 1,
+          name: "ToDoリスト V2 (項目削除)",
+          difficulty: "初級",
+          focus: "配列の不変的な操作",
+          concepts: "array.filter()",
+          hint: "各ToDo項目に削除ボタンを追加します。クリックされた項目のIDを元に、`filter`メソッドでその項目を除外した新しい配列を作成してstateを更新します。",
+          learn:
+            "Reactの不変性の原則に従い、stateの配列を直接変更するのではなく、新しい配列を生成して更新する方法を学びます。",
+        },
+        {
+          id: 12,
+          part: 1,
+          name: "ToDoリスト V3 (完了状態の切り替え)",
+          difficulty: "初級",
+          focus: "オブジェクト配列と条件付きスタイリング",
+          concepts: "Conditional Styling, array.map()",
+          hint: "ToDoリストのstateを、文字列の配列から`{id, text, completed}`というオブジェクトの配列に変更します。クリックで`completed`プロパティを反転させ、その値に応じてCSSクラスを切り替えます。",
+          learn:
+            "より複雑なデータ構造をstateで管理する方法と、stateの値に基づいて動的にスタイルを変更するテクニックを学びます。",
+        },
+        {
+          id: 13,
+          part: 1,
+          name: "アコーディオン / FAQコンポーネント",
+          difficulty: "初級",
+          focus: "UIの条件付きレンダリング",
+          concepts: "Conditional Rendering",
+          hint: "どの項目が開いているかをstateで管理します。クリックされた項目に対応するstateを更新し、内容の表示・非表示を切り替えます。",
+          learn:
+            "ユーザーの操作に応じてUIの一部を動的に表示したり隠したりする、条件付きレンダリングの基本をマスターします。",
+        },
+        {
+          id: 14,
+          part: 1,
+          name: "電卓アプリ",
+          difficulty: "初級",
+          focus: "複雑な状態ロジック",
+          concepts: "State Management",
+          hint: "現在の表示値、前の値、演算子などをすべてstateで管理する必要があります。ボタンが押されるたびに、これらのstateをロジックに従って更新します。",
+          learn:
+            "複数のstateが相互に作用する、より複雑なロジックをコンポーネント内で管理する練習になります。",
+        },
+        {
+          id: 15,
+          part: 1,
+          name: "デジタル時計",
+          difficulty: "初級",
+          focus: "副作用とライフサイクルイベント",
+          concepts: "useEffect Hook, Timers",
+          hint: "`useEffect`を使って、コンポーネントがマウントされた時に`setInterval`でタイマーを開始します。アンマウント時には必ず`clearInterval`でクリーンアップします。",
+          learn:
+            "`useEffect`フックを使って、コンポーネントのライフサイクル（マウント、アンマウント）に応じた副作用（タイマーなど）を管理する方法を学びます。",
+        },
+        {
+          id: 16,
+          part: 1,
+          name: "文字数カウンター",
+          difficulty: "初級",
+          focus: "状態からのUI派生",
+          concepts: "Controlled Components",
+          hint: "textareaの値をstateで管理し、そのstateの`.length`プロパティを常に表示します。stateが更新されるたびに、文字数表示も自動的に更新されます。",
+          learn:
+            "stateから直接UIを導出する、Reactの宣言的な性質を理解します。計算や変換はレンダリング中に行います。",
+        },
+        {
+          id: 17,
+          part: 1,
+          name: "ライト/ダークモード切替",
+          difficulty: "初級",
+          focus: "アプリケーション全体の状態制御",
+          concepts: "State, Conditional ClassName",
+          hint: "最上位の`App`コンポーネントにモードを管理するstate（例: `isDarkMode`）を持たせます。そのstateに応じて、コンテナ要素に特定のCSSクラスを付与/削除します。",
+          learn:
+            "Props Drillingの初歩として、アプリケーションのトップレベルで状態を管理し、下位のコンポーネントの表示に影響を与える方法を学びます。",
+        },
+        {
+          id: 18,
+          part: 1,
+          name: "三目並べゲーム",
+          difficulty: "初級",
+          focus: "複雑な状態とロジック",
+          concepts: "State Management, Immutability",
+          hint: "9つのマス目を表現する配列をstateで管理します。クリックされたマス目を更新する際は、元の配列を直接変更せず、新しい配列を作成します。勝敗判定ロジックも実装します。",
+          learn:
+            "複雑なゲームロジックをReactのstateで管理する方法、そしてReactにおける不変性(Immutability)の重要性を実践的に学びます。",
+        },
+        {
+          id: 19,
+          part: 1,
+          name: "じゃんけんゲーム",
+          difficulty: "初級",
+          focus: "状態変化に応じた副作用",
+          concepts: "useEffect for state changes",
+          hint: "プレイヤーの手とコンピューターの手をstateで管理します。プレイヤーの手が決まったら、`useEffect`を使ってコンピューターの手をランダムに決定し、勝敗を判定します。",
+          learn:
+            "特定のstateが変更されたことをトリガーとして、別のロジックを実行する`useEffect`の一般的な使い方を学びます。",
+        },
+        {
+          id: 20,
+          part: 1,
+          name: "コインフリップアプリ",
+          difficulty: "初級",
+          focus: "ランダムロジックと条件付きレンダリング",
+          concepts: "Conditional Rendering",
+          hint: "フリップ結果（表か裏か）をstateで管理します。ボタンクリックでランダムに結果を決定し、そのstateの値に応じて表示する画像やテキストを切り替えます。",
+          learn:
+            "ランダムな要素を含むアプリケーションの作成と、その結果に応じたUIの動的な変更方法を学びます。",
+        },
+        {
+          id: 21,
+          part: 1,
+          name: "サイコロアプリ",
+          difficulty: "初級",
+          focus: "複数の独立した状態管理",
+          concepts: "useState",
+          hint: "複数のサイコロを振る場合、それぞれのサイコロの値を個別のstateで管理するか、一つの配列stateで管理するかを検討します。",
+          learn:
+            "アプリケーション内で複数の独立した状態を`useState`を使って管理する方法を練習します。",
+        },
+        {
+          id: 22,
+          part: 1,
+          name: "パスワード強度チェッカー",
+          difficulty: "初級",
+          focus: "リアルタイムUIフィードバック",
+          concepts: "State-based UI, Regex",
+          hint: "入力されたパスワードをstateで管理します。入力が変わるたびに、正規表現などを使って強度（長さ、文字種など）を判定し、UIにフィードバック（色やテキスト）を表示します。",
+          learn:
+            "ユーザーの入力にリアルタイムで反応し、UIを更新することで、インタラクティブな体験を提供するアプリケーションの作り方を学びます。",
+        },
+        {
+          id: 23,
+          part: 1,
+          name: "ハングマンゲーム",
+          difficulty: "初級",
+          focus: "複雑なゲームロジック",
+          concepts: "State Interaction",
+          hint: "正解の単語、推測済みの文字の配列、間違えた回数などをすべてstateで管理します。ユーザーが文字を入力するたびに、これらのstateを更新し、ゲームの状態（続行、勝利、敗北）を判定します。",
+          learn:
+            "複数のstateが複雑に絡み合うゲームロジックを、Reactのstate管理でどのように整理し、実装するかを学びます。",
+        },
+        {
+          id: 24,
+          part: 1,
+          name: "カラーボックスアプリ",
+          difficulty: "初級",
+          focus: "配列内の状態操作",
+          concepts: "State in Arrays",
+          hint: "色の配列をstateで管理します。ボタンクリックでランダムな色を配列に追加したり、特定のボックスをクリックしてその色を変更したりする機能を実装します。",
+          learn:
+            "配列state内の特定の要素を、不変性を保ちながら更新する方法（`map`メソッドなど）を練習します。",
+        },
+        {
+          id: 25,
+          part: 1,
+          name: "ミームジェネレーター",
+          difficulty: "初級",
+          focus: "フォームとシンプルなAPI連携",
+          concepts: "useState, useEffect",
+          hint: "フォーム入力で上下のテキストをstateで管理します。画像は外部APIからランダムに取得し、取得した画像の上にテキストを重ねて表示します。",
+          learn:
+            "フォーム入力と、`useEffect`を使った初歩的なAPI連携を組み合わせる方法を学びます。",
+        },
+        {
+          id: 26,
+          part: 2,
+          name: "天気予報アプリ",
+          difficulty: "中級",
+          focus: "API連携の基本",
+          concepts: "useEffect, API Fetching, Loading/Error State",
+          hint: "OpenWeatherMap等の無料APIを使用します。`useEffect`内で`fetch`を呼び出し、`loading`と`error`の状態を必ず管理しましょう。",
+          learn:
+            "APIリクエストの完全なライフサイクル（ローディング、成功、エラー）の管理方法を学びます。",
+        },
+        {
+          id: 27,
+          part: 2,
+          name: "レシピ検索アプリ",
+          difficulty: "中級",
+          focus: "複雑なJSONデータの扱",
+          concepts: "API Fetching, Grid Layout",
+          hint: "TheMealDBなどのレシピAPIを利用します。取得したデータは複数のオブジェクトを含む配列になっているため、`.map()`を使って各レシピをカードとして表示します。",
+          learn:
+            "複雑なネスト構造を持つJSONデータをAPIから取得し、それを解析してUIに表示するスキルを習得します。",
+        },
+        {
+          id: 28,
+          part: 2,
+          name: "映画検索アプリ",
+          difficulty: "中級",
+          focus: "有名なAPIの利用",
+          concepts: "API Fetching, Data Display",
+          hint: "The Movie Database (TMDB) APIなどを使います。APIキーの取得と管理方法も学びましょう。検索結果をグリッドレイアウトで表示するのが一般的です。",
+          learn:
+            "ドキュメントが豊富なメジャーなAPIを実際に利用し、外部サービスと連携するアプリケーション開発の流れを体験します。",
+        },
+        {
+          id: 29,
+          part: 2,
+          name: "ランダムジョーク生成アプリ",
+          difficulty: "中級",
+          focus: "シンプルなAPI連携の反復練習",
+          concepts: "API Fetching",
+          hint: "JokeAPIなど、認証不要で手軽に使えるAPIで練習します。「新しいジョークを取得」ボタンを押すたびにAPIを叩く、というシンプルな実装です。",
+          learn:
+            "API連携の基本的なコーディングパターンを、繰り返し実装することで確実に身につけます。",
+        },
+        {
+          id: 30,
+          part: 2,
+          name: "GitHubユーザープロフィールビューア",
+          difficulty: "中級",
+          focus: "APIドキュメントの読解",
+          concepts: "API Documentation, Multiple Requests",
+          hint: "GitHubの公式APIを使い、ユーザー名で検索するとプロフィール情報やリポジトリ一覧を表示します。リポジトリ一覧は別のエンドポイントなので、複数のAPIリクエストが必要になる場合があります。",
+          learn:
+            "公式のAPIドキュメントを読み解き、必要なエンドポイントを見つけてリクエストを組み立てる、実践的なスキルを養います。",
+        },
+        {
+          id: 31,
+          part: 2,
+          name: "仮想通貨トラッカー",
+          difficulty: "中級",
+          focus: "リアルタイム更新データの取得",
+          concepts: "API Fetching, Timers",
+          hint: "CoinGeckoなどのAPIを使います。`useEffect`と`setInterval`を組み合わせ、数秒おきに価格データを再取得して表示を更新します。",
+          learn:
+            "定期的にデータをポーリングして、ほぼリアルタイムな情報を提供するアプリケーションの実装方法を学びます。",
+        },
+        {
+          id: 32,
+          part: 2,
+          name: "辞書アプリ",
+          difficulty: "中級",
+          focus: "構造化されたAPIレスポンスの扱",
+          concepts: "API Fetching",
+          hint: "Free Dictionary APIなどを利用します。一つの単語に対して複数の意味や発音記号、品詞などが返ってくるため、複雑なデータ構造を適切に表示する能力が問われます。",
+          learn:
+            "APIから返される、階層的で構造化されたデータを正確に解釈し、ユーザーフレンドリーなUIに整形するスキルを磨きます。",
+        },
+        {
+          id: 33,
+          part: 2,
+          name: "Unsplash画像ギャラリー",
+          difficulty: "中級",
+          focus: "画像APIと無限スクロールの基礎",
+          concepts: "Image API, Scroll Events",
+          hint: "Unsplash APIから画像リストを取得します。ページ下部までスクロールされたことを検知し、次のページのデータをAPIにリクエストしてリストに追記する「無限スクロール」を実装します。",
+          learn:
+            "画像に特化したAPIの利用方法と、スクロールイベントをトリガーにデータを追加していく無限スクロールの基本的なロジックを学びます。",
+        },
+        {
+          id: 34,
+          part: 2,
+          name: "IPアドレス検索",
+          difficulty: "中級",
+          focus: "ユーザー情報の取得",
+          concepts: "Geolocation API",
+          hint: "ip-api.comなどのAPIにリクエストを送ると、リクエスト元のIPアドレスに関する地理情報（国、都市など）が返ってきます。それを地図上などに表示します。",
+          learn:
+            "ユーザーの環境情報を取得するタイプのAPIの利用方法と、プライバシーに関する考慮事項を学びます。",
+        },
+        {
+          id: 35,
+          part: 2,
+          name: "書籍検索アプリ",
+          difficulty: "中級",
+          focus: "Google Books APIの利用",
+          concepts: "API Fetching",
+          hint: "Google Books APIを使い、書籍名や著者名で検索できるようにします。検索結果には書影やあらすじなどが含まれるため、リッチな表示が可能です。",
+          learn:
+            "Googleが提供するような大規模で多機能なAPIの利用方法と、その認証プロセスについて学びます。",
+        },
+        {
+          id: 36,
+          part: 2,
+          name: "歌詞検索アプリ",
+          difficulty: "中級",
+          focus: "音楽関連APIの利用",
+          concepts: "API Fetching",
+          hint: "Genius APIなどを使い、曲名やアーティスト名から歌詞を検索します。APIによっては利用規約が厳しい場合があるので注意が必要です。",
+          learn:
+            "音楽やエンターテイメント系のAPIを扱う際の注意点や、テキストデータを整形して表示するテクニックを学びます。",
+        },
+        {
+          id: 37,
+          part: 2,
+          name: "国情報アプリ",
+          difficulty: "中級",
+          focus: "REST Countries APIの利用",
+          concepts: "API Fetching",
+          hint: "REST Countries APIは、世界の国々に関する詳細なデータ（首都、人口、国旗など）を提供します。国名で検索したり、一覧表示したりする機能を実装します。",
+          learn:
+            "網羅的なデータを提供するAPIを使い、フィルタリングや検索機能を組み合わせることで、情報探索ツールを作成する方法を学びます。",
+        },
+        {
+          id: 38,
+          part: 2,
+          name: "ランダムユーザー生成",
+          difficulty: "中級",
+          focus: "複数のデータポイントを持つAPI",
+          concepts: "API Fetching",
+          hint: "Random User Generator APIなどを使うと、名前、住所、写真などを含む架空のユーザーデータを生成できます。テストデータの作成などに便利です。",
+          learn:
+            "ダミーデータを生成するAPIの活用方法と、複数のデータ項目をまとめて表示するUIの設計を学びます。",
+        },
+        {
+          id: 39,
+          part: 2,
+          name: "ブログフロントエンド (Read)",
+          difficulty: "中級",
+          focus: "CRUD操作: 読み取り",
+          concepts: "Mock API, GET request",
+          hint: "JSONPlaceholderなどのモックAPIサーバを使います。`/posts`エンドポイントにGETリクエストを送り、ブログ記事のリストを取得して表示します。",
+          learn:
+            "CRUD操作の基本であるRead(読み取り)を、GETメソッドを使って実装する方法を学びます。",
+        },
+        {
+          id: 40,
+          part: 2,
+          name: "ブログフロントエンド (Create)",
+          difficulty: "中級",
+          focus: "CRUD操作: 作成",
+          concepts: "Mock API, POST request",
+          hint: "タイトルと本文を入力するフォームを作成します。送信時に、入力内容をボディに含めて`/posts`エンドポイントにPOSTリクエストを送ります。",
+          learn:
+            "CRUD操作のCreate(作成)を、POSTメソッドとフォームデータを使って実装する方法を学びます。",
+        },
+        {
+          id: 41,
+          part: 2,
+          name: "ブログフロントエンド (Delete)",
+          difficulty: "中級",
+          focus: "CRUD操作: 削除",
+          concepts: "Mock API, DELETE request",
+          hint: "各記事に削除ボタンを設置します。クリックされると、`/posts/:id`のように特定の記事IDを指定したエンドポイントにDELETEリクエストを送ります。",
+          learn:
+            "CRUD操作のDelete(削除)を、DELETEメソッドとURLパラメータを使って実装する方法を学びます。",
+        },
+        {
+          id: 42,
+          part: 2,
+          name: "ブログフロントエンド (Update)",
+          difficulty: "中級",
+          focus: "CRUD操作: 更新",
+          concepts: "Mock API, PUT/PATCH request",
+          hint: "編集ボタンをクリックするとフォームが表示され、既存の内容が入力された状態になります。送信時に、`/posts/:id`にPUTまたはPATCHリクエストを送ります。",
+          learn:
+            "CRUD操作のUpdate(更新)を、PUT/PATCHメソッドを使って実装する方法を学びます。",
+        },
+        {
+          id: 43,
+          part: 2,
+          name: "ユーザー管理ダッシュボード (CRUD)",
+          difficulty: "中級",
+          focus: "完全なCRUDサイクルの実践",
+          concepts: "Mock API, CRUD",
+          hint: "ユーザーリストの表示(Read)、新規ユーザー追加フォーム(Create)、編集フォーム(Update)、削除ボタン(Delete)を一つの画面に実装します。",
+          learn:
+            "これまで学んだCRUD操作を一つのアプリケーションに統合し、データ管理の基本的なサイクルを完成させます。",
+        },
+        {
+          id: 44,
+          part: 2,
+          name: "写真アルバムアプリ (CRUD)",
+          difficulty: "中級",
+          focus: "CRUDと画像データの扱",
+          concepts: "Mock API, CRUD",
+          hint: "写真のURLとタイトルを管理するCRUDアプリを構築します。画像の表示には`<img>`タグを使用します。",
+          learn:
+            "テキストデータだけでなく、画像URLなどのメディア情報を含むデータのCRUD操作を練習します。",
+        },
+        {
+          id: 45,
+          part: 2,
+          name: "ToDoリスト (API連携版)",
+          difficulty: "中級",
+          focus: "CRUDの反復練習",
+          concepts: "Mock API, CRUD",
+          hint: "Part1で作成したToDoリストを、stateではなくAPIサーバーと通信するように作り変えます。追加、削除、完了状態の変更がすべてAPIリクエストになります。",
+          learn:
+            "既存のフロントエンド完結型アプリを、バックエンド連携型にリファクタリングする実践的なスキルを習得します。",
+        },
+        {
+          id: 46,
+          part: 2,
+          name: "商品リスト管理 (CRUD)",
+          difficulty: "中級",
+          focus: "CRUDの反復練習",
+          concepts: "Mock API, CRUD",
+          hint: "商品名、価格、在庫数などを管理するCRUDアプリを作成します。Eコマースサイトの管理者画面を想定した練習です。",
+          learn:
+            "ビジネスアプリケーションで頻出する、商品データのような実用的なデータモデルでCRUDを練習します。",
+        },
+        {
+          id: 47,
+          part: 2,
+          name: "コメントシステム (CRUD)",
+          difficulty: "中級",
+          focus: "CRUDの反復練習",
+          concepts: "Mock API, CRUD",
+          hint: "ブログ記事の下に表示されるようなコメント欄を実装します。コメントの投稿(Create)、表示(Read)、削除(Delete)機能が必要です。",
+          learn:
+            "ユーザー生成コンテンツ(UGC)を扱うアプリケーションの基本的な構成要素であるコメント機能の実装を学びます。",
+        },
+        {
+          id: 48,
+          part: 2,
+          name: "連絡先管理帳 (CRUD)",
+          difficulty: "中級",
+          focus: "CRUDの反復練習",
+          concepts: "Mock API, CRUD",
+          hint: "名前、電話番号、メールアドレスなどを管理するアプリケーションを構築します。CRUD操作を一通り実装しましょう。",
+          learn:
+            "個人情報のような、複数のフィールドを持つデータ構造でCRUD操作を練習します。",
+        },
+        {
+          id: 49,
+          part: 2,
+          name: "イベントカレンダー (CRUD)",
+          difficulty: "中級",
+          focus: "CRUDの反復練習",
+          concepts: "Mock API, CRUD",
+          hint: "イベント名、日付、場所などを管理する機能を実装します。カレンダー表示UIと連携させるとより実践的になります。",
+          learn:
+            "日付や時刻データを含むイベント情報のCRUD操作を通じて、時系列データの扱い方を学びます。",
+        },
+        {
+          id: 50,
+          part: 2,
+          name: "簡易在庫管理システム (CRUD)",
+          difficulty: "中級",
+          focus: "CRUDの反復練習",
+          concepts: "Mock API, CRUD",
+          hint: "商品ID、在庫数、最終更新日などを管理するシステムを構築します。在庫の増減をUpdate操作で実現します。",
+          learn:
+            "数値データのインクリメント/デクリメントなど、単純な更新以外のUpdate操作を練習します。",
+        },
+        {
+          id: 51,
+          part: 3,
+          name: "マルチページサイトの雛形",
+          difficulty: "中級",
+          focus: "クライアントサイドルーティング",
+          concepts: "React Router, BrowserRouter, Link",
+          hint: "`react-router-dom`をインストールし、アプリ全体を`<BrowserRouter>`でラップします。`<a>`タグを`<Link>`に置き換えるのがポイントです。",
+          learn:
+            "`BrowserRouter`, `Routes`, `Route`, `Link`を使った基本的なクライアントサイドルーティングを学びます。",
+        },
+        {
+          id: 52,
+          part: 3,
+          name: "ブログ詳細ページ (動的ルーティング)",
+          difficulty: "中級",
+          focus: "動的ルーティング",
+          concepts: "React Router, useParams",
+          hint: '`path="/post/:id"`のようにルートを定義します。コンポーネント内で`useParams`フックを使ってURLから`:id`部分を取得し、そのIDに対応するブログ記事データを表示します。',
+          learn:
+            "ユーザーが特定のアイテムを選択した際に、そのIDをURLに含めて表示する動的ルーティングの実装方法を学びます。",
+        },
+        {
+          id: 53,
+          part: 3,
+          name: "ECサイトのネストされたルート",
+          difficulty: "中級",
+          focus: "ネストされたルーティング",
+          concepts: "React Router, Outlet",
+          hint: "`/products`という親ルートの中に、`/products/overview`や`/products/reviews`といった子ルートを作成します。親ルートコンポーネントに`<Outlet />`を配置するのが鍵です。",
+          learn:
+            "ルートを階層構造で管理するネストされたルーティングの仕組みと、`<Outlet>`コンポーネントの役割を理解します。",
+        },
+        {
+          id: 54,
+          part: 3,
+          name: "認証付きルート（フェイク）",
+          difficulty: "中級",
+          focus: "保護されたルート",
+          concepts: "React Router, Conditional Routing",
+          hint: "ログイン状態を管理するstate（例: `isLoggedIn`）を用意します。このstateが`false`の場合に、特定のルート（例: `/dashboard`）へのアクセスをログインページにリダイレクトするコンポーネントを作成します。",
+          learn:
+            "認証状態に応じて特定のページへのアクセスを制御する、保護されたルート（Protected Route）の実装パターンを学びます。",
+        },
+        {
+          id: 55,
+          part: 3,
+          name: "404 Not Foundページ",
+          difficulty: "中級",
+          focus: "エラーハンドリング",
+          concepts: "React Router, Wildcard Route",
+          hint: '`<Routes>`の最後に`path="*"`を持つルートを追加します。ここに`NotFound`コンポーネントを指定すれば、どのルートにもマッチしなかった場合に表示されます。',
+          learn:
+            "定義されていないURLにアクセスされた際に、適切な「ページが見つかりません」画面を表示する方法を学びます。",
+        },
+        {
+          id: 56,
+          part: 3,
+          name: "プログラムによるナビゲーション",
+          difficulty: "中級",
+          focus: "プログラムによる画面遷移",
+          concepts: "React Router, useNavigate",
+          hint: "フォーム送信後やログイン成功後など、特定の処理が完了したタイミングでページを遷移させたい場合に使います。`useNavigate`フックを取得し、`navigate('/path')`のように呼び出します。",
+          learn:
+            "ユーザーのクリックだけでなく、コードのロジックに基づいて動的にページ遷移を発生させる方法を学びます。",
+        },
+        {
+          id: 57,
+          part: 3,
+          name: "クエリパラメータの利用",
+          difficulty: "中級",
+          focus: "URLクエリの操作",
+          concepts: "React Router, useSearchParams",
+          hint: "検索結果ページなどで、`?q=react&sort=popular`のようなURLを扱います。`useSearchParams`フックを使って、これらのクエリパラメータを読み取ったり、更新したりします。",
+          learn:
+            "URLのクエリ文字列を使って、ページの表示状態（フィルタ、ソート順など）を管理・共有する方法を学びます。",
+        },
+        {
+          id: 58,
+          part: 3,
+          name: "アクティブなリンクのスタイリング",
+          difficulty: "中級",
+          focus: "UIとURLの同期",
+          concepts: "React Router, NavLink",
+          hint: "通常の`<Link>`の代わりに`<NavLink>`コンポーネントを使用します。アクティブな（現在表示しているページに対応する）リンクに対して、自動的にCSSクラスが付与されるので、スタイルを簡単に適用できます。",
+          learn:
+            "ナビゲーションメニューなどで、現在地を視覚的に示すための便利な方法を習得します。",
+        },
+        {
+          id: 59,
+          part: 3,
+          name: "スクロール位置の復元",
+          difficulty: "中級",
+          focus: "ユーザー体験の向上",
+          concepts: "React Router, Scroll Restoration",
+          hint: "React Routerはデフォルトでスクロール位置をある程度管理してくれますが、より細かく制御したい場合にカスタムコンポーネントを作成します。`useLocation`でページの変更を検知し、`window.scrollTo(0, 0)`を実行します。",
+          learn:
+            "ページ遷移時にスクロール位置をページ最上部にリセットし、ユーザー体験を向上させる方法を学びます。",
+        },
+        {
+          id: 60,
+          part: 3,
+          name: "ルーティング付きのマルチステップフォーム",
+          difficulty: "中級",
+          focus: "複雑なUIフロー",
+          concepts: "React Router",
+          hint: "フォームの各ステップを個別のルート（例: `/wizard/step1`, `/wizard/step2`）として定義します。「次へ」ボタンで次のルートにプログラムでナビゲーションさせます。",
+          learn:
+            "長いフォームを複数のページに分割し、ユーザーの負担を軽減するウィザード形式のUIをReact Routerで構築する方法を学びます。",
+        },
+        {
+          id: 61,
+          part: 3,
+          name: "Prop Drilling問題の実体験",
+          difficulty: "中級",
+          focus: "状態管理の問題点の理解",
+          concepts: "Prop Drilling",
+          hint: "最上位のコンポーネントで定義したstateとセッター関数を、中間のコンポーネントを経由して、実際にそれを使用する深い階層の子コンポーネントまで、ひたすらpropsでバケツリレーします。",
+          learn:
+            "`props`だけで状態を渡していくことの非効率さや、コードの可読性低下といった問題点を身をもって体験し、状態管理ライブラリの必要性を理解します。",
+        },
+        {
+          id: 62,
+          part: 3,
+          name: "Context APIによるProp Drillingの解決",
+          difficulty: "中級",
+          focus: "シンプルなグローバル状態管理",
+          concepts: "createContext, useContext",
+          hint: "`createContext`でコンテキストオブジェクトを作成します。状態を渡したいコンポーネントツリーを`<MyContext.Provider>`で囲み、受け取りたいコンポーネントで`useContext`フックを使います。",
+          learn:
+            "Reactに組み込まれたContext APIを使って、propsのバケツリレーなしに、コンポーネントツリーの深い場所へ状態を直接渡す方法を学びます。",
+        },
+        {
+          id: 63,
+          part: 3,
+          name: "Contextによるテーマ切替機能",
+          difficulty: "中級",
+          focus: "Context APIの実践的な利用",
+          concepts: "useContext",
+          hint: "テーマ（例: `'light'` or `'dark'`）とそれを切り替える関数を値として持つコンテキストを作成します。アプリケーション全体をProviderでラップし、各コンポーネントで`useContext`を使ってテーマに応じたスタイルを適用します。",
+          learn:
+            "Context APIの典型的なユースケースである、テーマ（UIモード）のグローバルな管理方法を実践します。",
+        },
+        {
+          id: 64,
+          part: 3,
+          name: "ZustandによるECサイトカート (追加)",
+          difficulty: "上級",
+          focus: "軽量なグローバル状態管理",
+          concepts: "Zustand, State Management",
+          hint: "Zustandをインストールし、`create`関数でストアを作成します。ストアは`items`配列と`addToCart`などのアクションを持ちます。コンポーネントからはフックとして呼び出すだけです。",
+          learn:
+            "軽量でモダンなフックベースのグローバル状態管理を学びます。Reduxとの違いを体感しましょう。",
+        },
+        {
+          id: 65,
+          part: 3,
+          name: "ZustandによるECサイトカート (削除)",
+          difficulty: "上級",
+          focus: "状態の更新",
+          concepts: "Zustand",
+          hint: "`removeFromCart`アクションをストアに定義します。アクション内では`set`関数を使い、現在のstateを受け取って、指定されたIDのアイテムを除外した新しいstateを返します。",
+          learn:
+            "Zustandストア内の状態を、アクションを通じて不変性を保ちながら更新する基本的な方法を学びます。",
+        },
+        {
+          id: 66,
+          part: 3,
+          name: "ZustandによるECサイトカート (数量変更)",
+          difficulty: "上級",
+          focus: "複雑な状態更新",
+          concepts: "Zustand",
+          hint: "`updateQuantity`アクションを定義します。商品IDと新しい数量を受け取り、`items`配列内の該当する商品の`quantity`プロパティを更新します。",
+          learn:
+            "配列内の特定オブジェクトのプロパティを更新するという、より実践的な状態更新ロジックを実装します。",
+        },
+        {
+          id: 67,
+          part: 3,
+          name: "ZustandによるECサイトカート (合計金額計算)",
+          difficulty: "上級",
+          focus: "派生状態の計算",
+          concepts: "Zustand, Selectors",
+          hint: "合計金額はstateとして保持するのではなく、カート内の`items`配列からその都度計算して導出します。コンポーネント側で`useStore`フックのセレクター関数内で計算ロジックを記述します。",
+          learn:
+            "stateから派生する値（Derived State）の考え方を学び、状態を最小限に保つ重要性を理解します。",
+        },
+        {
+          id: 68,
+          part: 3,
+          name: "ZustandによるECサイトカート (永続化)",
+          difficulty: "上級",
+          focus: "状態の永続化",
+          concepts: "Zustand Middleware",
+          hint: "Zustandが提供する`persist`ミドルウェアを使います。ストア作成時に`persist(...)`でラップするだけで、自動的に`localStorage`に状態が保存され、リロードしても復元されます。",
+          learn:
+            "ミドルウェアを使ってストアの機能を拡張する方法と、クライアントサイドで状態を永続化させる簡単な方法を学びます。",
+        },
+        {
+          id: 69,
+          part: 3,
+          name: "Redux ToolkitによるECサイトカート (セットアップ)",
+          difficulty: "上級",
+          focus: "構造化された状態管理",
+          concepts: "Redux Toolkit, createSlice",
+          hint: "`@reduxjs/toolkit`と`react-redux`をインストールします。`createSlice`を使って、カートの状態、Reducer、Action Creatorをまとめて定義します。`configureStore`でストアを設定します。",
+          learn:
+            "Reduxの定型的なコードを大幅に削減するRedux Toolkitの基本的な使い方と、Sliceという概念を学びます。",
+        },
+        {
+          id: 70,
+          part: 3,
+          name: "Redux ToolkitによるECサイトカート (追加/削除)",
+          difficulty: "上級",
+          focus: "ActionとReducer",
+          concepts: "Redux Toolkit",
+          hint: "`createSlice`の`reducers`オブジェクト内に、`addToCart`や`removeFromCart`といったメソッドを定義します。これらのメソッドがReducer関数となり、`state`と`action`を引数に取ります。",
+          learn:
+            "`createSlice`内でReducerを定義し、Actionがdispatchされたときにどのようにstateが更新されるかというReduxの中心的なフローを学びます。",
+        },
+        {
+          id: 71,
+          part: 3,
+          name: "Redux ToolkitによるECサイトカート (UI連携)",
+          difficulty: "上級",
+          focus: "useSelector, useDispatch",
+          concepts: "React-Redux",
+          hint: "コンポーネントでカートの状態を読み取るには`useSelector`フックを使います。アクションを実行（dispatch）するには`useDispatch`フックを使います。",
+          learn:
+            "ReactコンポーネントとReduxストアを接続するための、`react-redux`ライブラリが提供する基本的なフックの使い方をマスターします。",
+        },
+        {
+          id: 72,
+          part: 3,
+          name: "Redux ToolkitによるECサイトカート (合計金額計算)",
+          difficulty: "上級",
+          focus: "派生状態の計算",
+          concepts: "Redux Toolkit, Selectors",
+          hint: "`useSelector`フック内で直接計算ロジックを書くこともできますが、再計算を最適化するために`createSelector`（Reselectライブラリ）を使うのが一般的です。",
+          learn:
+            "Reduxにおける派生データの計算方法と、パフォーマンス最適化のためのセレクターの概念を学びます。",
+        },
+        {
+          id: 73,
+          part: 3,
+          name: "Redux ToolkitによるECサイトカート (永続化)",
+          difficulty: "上級",
+          focus: "状態の永続化",
+          concepts: "Redux Persist",
+          hint: "`redux-persist`ライブラリを使います。ストア設定を少し変更し、永続化したいReducerを指定するだけで、リロードしてもstateが復元されるようになります。",
+          learn:
+            "Reduxのエコシステムと連携するサードパーティライブラリを使って、ストアの機能を拡張する方法を学びます。",
+        },
+        {
+          id: 74,
+          part: 3,
+          name: "Redux Thunkによる非同期処理",
+          difficulty: "上級",
+          focus: "ReduxでのAPI連携",
+          concepts: "Redux Thunk, createAsyncThunk",
+          hint: "Redux ToolkitにはThunkが組み込まれています。`createAsyncThunk`を使って非同期処理（APIリクエストなど）を定義します。これにより、pending, fulfilled, rejectedという3つの状態に応じたReducerを自動で生成できます。",
+          learn:
+            "Reduxで非同期通信を扱うための標準的な方法であるThunkと、Redux Toolkitによるそのモダンな実装方法を学びます。",
+        },
+        {
+          id: 75,
+          part: 3,
+          name: "`useReducer`による複雑なフォーム",
+          difficulty: "中級",
+          focus: "複雑なローカル状態管理",
+          concepts: "useReducer Hook",
+          hint: "複数の関連するstateを持つフォーム（例: 入力値、バリデーションエラー、送信状態）を、`useState`を複数使う代わりに`useReducer`で一元管理します。actionオブジェクトで更新の種類を表現します。",
+          learn:
+            "`useState`では管理が煩雑になるような、複雑なロジックを持つローカル状態を、`useReducer`を使ってより構造化して管理する方法を学びます。",
+        },
+        {
+          id: 76,
+          part: 4,
+          name: "大規模データグリッド (問題の再現)",
+          difficulty: "上級",
+          focus: "パフォーマンス問題の特定",
+          concepts: "Performance Profiling",
+          hint: "数千行のデータを単純に`.map()`でレンダリングするコンポーネントを作成します。入力フィールドなどを設け、文字を入力するたびにグリッド全体が再レンダリングされ、動作が重くなることを確認します。",
+          learn:
+            "React Developer ToolsのProfilerを使い、コンポーネントのレンダリングにかかる時間や、不要な再レンダリングが発生している箇所を特定する方法を学びます。",
+        },
+        {
+          id: 77,
+          part: 4,
+          name: "`useMemo`による計算の最適化",
+          difficulty: "上級",
+          focus: "パフォーマンス最適化",
+          concepts: "useMemo Hook",
+          hint: "レンダリングのたびに実行されるコストの高い計算（ソートやフィルタリングなど）を`useMemo`でラップします。依存配列を正しく設定することで、依存する値が変化したときだけ再計算されるようになります。",
+          learn:
+            "`useMemo`を使い、不要な再計算を防ぐことでパフォーマンスを最適化する方法を学びます。メモ化の概念を理解します。",
+        },
+        {
+          id: 78,
+          part: 4,
+          name: "`useCallback`と`React.memo`による再レンダリング防止",
+          difficulty: "上級",
+          focus: "パフォーマンス最適化",
+          concepts: "useCallback, React.memo",
+          hint: "子コンポーネントに渡す関数を`useCallback`でメモ化し、子コンポーネント自体を`React.memo`でラップします。これにより、親が再レンダリングされても、子に渡るpropsが変化しない限り、子の再レンダリングを防ぎます。",
+          learn:
+            "不要な再レンダリングが子コンポーネントに伝播するのを防ぐための、`useCallback`と`React.memo`の連携パターンをマスターします。",
+        },
+        {
+          id: 79,
+          part: 4,
+          name: "リストの仮想化（ウィンドウイング）",
+          difficulty: "上級",
+          focus: "大量データ表示の最適化",
+          concepts: "react-window",
+          hint: "`react-window`や`react-virtualized`といったライブラリを使います。これにより、数千行のリストがあっても、実際に画面に見えている部分のDOMだけを描画し、パフォーマンスを劇的に改善します。",
+          learn:
+            "大量のデータを効率的に表示するための「仮想化」という重要なテクニックと、そのためのライブラリの使い方を学びます。",
+        },
+        {
+          id: 80,
+          part: 4,
+          name: "バンドルサイズの分析",
+          difficulty: "上級",
+          focus: "パフォーマンス最適化",
+          concepts: "Bundle Analyzer",
+          hint: "`webpack-bundle-analyzer`などのツールをビルドプロセスに導入します。ビルド後に生成されるJSファイル（バンドル）の内容を視覚化し、どのライブラリがサイズを圧迫しているかを特定します。",
+          learn:
+            "アプリケーションの初期ロード時間に影響するバンドルサイズを分析し、不要なライブラリの削除や、より軽量な代替手段への置換を検討するスキルを学びます。",
+        },
+        {
+          id: 81,
+          part: 4,
+          name: "`useFetch`カスタムフックの作成",
+          difficulty: "上級",
+          focus: "ロジックの再利用",
+          concepts: "Custom Hooks",
+          hint: "`useFetch(url)`というカスタムフックを作成します。内部で`useState`と`useEffect`を使い、`{ data, loading, error }`という状態オブジェクトを返します。",
+          learn:
+            "コンポーネント間でロジックを再利用するためのカスタムフックの作り方を学び、DRY(Don't Repeat Yourself)原則を実践します。",
+        },
+        {
+          id: 82,
+          part: 4,
+          name: "`useLocalStorage`カスタムフックの作成",
+          difficulty: "上級",
+          focus: "ロジックの再利用",
+          concepts: "Custom Hooks",
+          hint: "`useState`と似たインターフェースを持つ`useLocalStorage(key, initialValue)`フックを作成します。状態が更新されるたびに、自動的に`localStorage`にも保存されるようにします。",
+          learn:
+            "状態管理と副作用（localStorageへの書き込み）を組み合わせた、より実践的なカスタムフックの作成方法を学びます。",
+        },
+        {
+          id: 83,
+          part: 4,
+          name: "`useToggle`カスタムフックの作成",
+          difficulty: "上級",
+          focus: "ロジックの再利用",
+          concepts: "Custom Hooks",
+          hint: "`const [value, toggleValue] = useToggle(false)`のように使えるフックを作成します。`toggleValue`を呼び出すだけでbooleanの状態が反転するようにします。",
+          learn:
+            "頻繁に使われるシンプルな状態ロジックを、再利用可能なカスタムフックとして抽象化する方法を学びます。",
+        },
+        {
+          id: 84,
+          part: 4,
+          name: "`useOnlineStatus`カスタムフックの作成",
+          difficulty: "上級",
+          focus: "ロジックの再利用",
+          concepts: "Custom Hooks",
+          hint: "ブラウザの`online`および`offline`イベントをリッスンする`useEffect`を内部に持つフックを作成します。ユーザーのオンライン状態をbooleanで返します。",
+          learn:
+            "ブラウザのイベントリスナーを管理する副作用を含むカスタムフックの作り方を学びます。",
+        },
+        {
+          id: 85,
+          part: 4,
+          name: "`useFormInput`カスタムフックの作成",
+          difficulty: "上級",
+          focus: "ロジックの再利用",
+          concepts: "Custom Hooks",
+          hint: "`const nameInput = useFormInput('John')`のように使い、`{ value: 'John', onChange: ... }`のようなオブジェクトを返すフックです。`input`タグに`{...nameInput}`と渡すだけで済みます。",
+          learn:
+            "フォームの入力フィールドにおける定型的なstate管理ロジックを、カスタムフックでカプセル化し、コードを簡潔にする方法を学びます。",
+        },
+        {
+          id: 86,
+          part: 4,
+          name: "TypeScriptによるToDoリスト (セットアップ)",
+          difficulty: "上級",
+          focus: "静的型付けの導入",
+          concepts: "TypeScript, React",
+          hint: "`npx create-react-app my-app --template typescript`でプロジェクトを開始します。ファイル拡張子が`.tsx`になることを確認します。",
+          learn:
+            "ReactプロジェクトにTypeScriptを導入する基本的な方法と、そのための環境設定について学びます。",
+        },
+        {
+          id: 87,
+          part: 4,
+          name: "TypeScriptによるToDoリスト (Propsの型付け)",
+          difficulty: "上級",
+          focus: "型安全なコンポーネント",
+          concepts: "TypeScript Interfaces",
+          hint: "コンポーネントが受け取るpropsの型を`interface`または`type`で定義します。例えば、`interface TodoItemProps { text: string; completed: boolean; }`のように記述します。",
+          learn:
+            "コンポーネントのpropsに型を付けることで、意図しない型のデータが渡されるのを防ぎ、コンポーネントの仕様を明確にする方法を学びます。",
+        },
+        {
+          id: 88,
+          part: 4,
+          name: "TypeScriptによるToDoリスト (Stateの型付け)",
+          difficulty: "上級",
+          focus: "型安全な状態管理",
+          concepts: "TypeScript, useState",
+          hint: "`useState`にジェネリクスを使ってstateの型を指定します。例えば、`useState<Todo[]>([]);`のようにし、`Todo`型は`interface Todo { id: number; text: string; }`のように定義します。",
+          learn:
+            "`useState`で管理する状態に型を付けることで、状態のデータ構造を保証し、予期せぬエラーを防ぐ方法を学びます。",
+        },
+        {
+          id: 89,
+          part: 4,
+          name: "TypeScriptによるToDoリスト (Eventの型付け)",
+          difficulty: "上級",
+          focus: "型安全なイベントハンドラ",
+          concepts: "TypeScript, Event Types",
+          hint: "イベントハンドラ関数の引数に型を付けます。例えば、フォームのonChangeイベントは`React.ChangeEvent<HTMLInputElement>`、ボタンのクリックイベントは`React.MouseEvent<HTMLButtonElement>`です。",
+          learn:
+            "イベントオブジェクトのプロパティ（`e.target.value`など）に安全にアクセスするための、イベントの型付け方法を学びます。",
+        },
+        {
+          id: 90,
+          part: 4,
+          name: "TypeScriptによる天気予報アプリ (APIレスポンスの型付け)",
+          difficulty: "上級",
+          focus: "APIデータの型安全な扱い",
+          concepts: "TypeScript, Interfaces",
+          hint: "APIから返ってくるJSONデータの構造に合わせて`interface`を定義します。`fetch`で取得したデータを、定義したinterfaceの型の変数に格納することで、プロパティへのアクセスが型安全になります。",
+          learn:
+            "外部APIから取得する動的なデータに対して型を定義し、アプリケーション内で安全に扱うための重要なテクニックを学びます。",
+        },
+        {
+          id: 91,
+          part: 4,
+          name: "TypeScriptとGenerics",
+          difficulty: "上級",
+          focus: "再利用可能な型付きコンポーネント",
+          concepts: "TypeScript Generics",
+          hint: "特定のデータ型に依存しない、汎用的なコンポーネントやフックを作成する際に使います。例えば、様々な型のデータを扱える`useFetch<T>`カスタムフックを作成します。",
+          learn:
+            "ジェネリクスを使って、型安全性を保ちながらも、より再利用性の高いコンポーネントや関数を作成する方法を学びます。",
+        },
+        {
+          id: 92,
+          part: 4,
+          name: "TypeScriptと`React.FC`",
+          difficulty: "上級",
+          focus: "コンポーネントの型定義",
+          concepts: "React.FC",
+          hint: "関数コンポーネントの型として`React.FC<Props>`（`React.FunctionComponent<Props>`のエイリアス）を使います。これにより、propsの型付けと、`children`が暗黙的に含まれることを示せます。",
+          learn:
+            "関数コンポーネントを型定義するための一般的な方法の一つである`React.FC`の使い方とその利点・注意点を学びます。",
+        },
+        {
+          id: 93,
+          part: 4,
+          name: "Next.jsによるブログ (セットアップとルーティング)",
+          difficulty: "上級",
+          focus: "Reactフレームワークの導入",
+          concepts: "Next.js, File-system Routing",
+          hint: "`npx create-next-app`でプロジェクトを開始します。`pages`ディレクトリに`about.js`というファイルを作成すると、自動的に`/about`というルートが作成されます。",
+          learn:
+            "Next.jsの根幹であるファイルシステムベースのルーティングと、その開発体験の良さを学びます。",
+        },
+        {
+          id: 94,
+          part: 4,
+          name: "Next.jsによるブログ (SSG)",
+          difficulty: "上級",
+          focus: "静的サイト生成",
+          concepts: "Next.js, getStaticProps",
+          hint: "ページコンポーネントファイル内で`getStaticProps`という非同期関数を`export`します。この関数内でAPIからデータを取得し、`props`としてページコンポーネントに渡します。ビルド時にページが生成されます。",
+          learn:
+            "ビルド時にデータを取得して静的なHTMLを生成するSSG(Static Site Generation)の仕組みを学び、高速な表示とSEOの利点を理解します。",
+        },
+        {
+          id: 95,
+          part: 4,
+          name: "Next.jsによるブログ (動的SSG)",
+          difficulty: "上級",
+          focus: "動的な静的ページの生成",
+          concepts: "Next.js, getStaticPaths",
+          hint: "`pages/posts/[id].js`のような動的なルートファイルで、`getStaticPaths`を`export`します。この関数はビルド時に生成すべきページのパス（IDの一覧）を返します。`getStaticProps`では、そのIDを使って個別のデータを取得します。",
+          learn:
+            "ブログの記事ページのように、動的なパスを持つページを事前に静的生成する方法を学びます。",
+        },
+        {
+          id: 96,
+          part: 4,
+          name: "Next.jsによるダッシュボード (SSR)",
+          difficulty: "上級",
+          focus: "サーバーサイドレンダリング",
+          concepts: "Next.js, getServerSideProps",
+          hint: "ページコンポーネントファイルで`getServerSideProps`を`export`します。これはリクエストごとにサーバーサイドで実行され、常に最新のデータを取得してページをレンダリングします。",
+          learn:
+            "リクエストごとにHTMLをサーバーで生成するSSR(Server-Side Rendering)の仕組みを学び、常に最新のデータが必要なページでの利点を理解します。",
+        },
+        {
+          id: 97,
+          part: 4,
+          name: "Next.jsによるダッシュボード (SSGとSSRの比較)",
+          difficulty: "上級",
+          focus: "レンダリング戦略の選択",
+          concepts: "SSR vs SSG",
+          hint: "ブログのように更新頻度が低いコンテンツはSSG、ユーザー固有の情報が表示されるマイページのようなものはSSR、とユースケースによって使い分けを検討します。",
+          learn:
+            "SSG、SSR、そしてCSR（クライアントサイドレンダリング）のそれぞれの特性を理解し、ページの要件に応じて最適なレンダリング手法を選択する能力を養います。",
+        },
+        {
+          id: 98,
+          part: 4,
+          name: "Next.jsの画像最適化",
+          difficulty: "上級",
+          focus: "パフォーマンス最適化",
+          concepts: "Next.js Image Component",
+          hint: "通常の`<img>`タグの代わりに、Next.jsの`<Image>`コンポーネントを使います。これにより、画像の自動リサイズ、フォーマット変換（WebPなど）、遅延読み込みが行われ、パフォーマンスが向上します。",
+          learn:
+            "Webサイトのパフォーマンスに大きな影響を与える画像を、Next.jsの機能を使って簡単に最適化する方法を学びます。",
+        },
+        {
+          id: 99,
+          part: 4,
+          name: "Next.js API Routesによるコンタクトフォーム (バックエンド)",
+          difficulty: "上級",
+          focus: "フルスタックReact",
+          concepts: "Next.js API Routes",
+          hint: "`pages/api`ディレクトリにファイル（例: `contact.js`）を作成します。このファイルで`export default`した関数がAPIエンドポイントになります。ここでフォームデータを受け取り、メール送信などの処理を記述します。",
+          learn:
+            "Next.jsを使って、フロントエンドと同じプロジェクト内にサーバーレス関数として動作するAPIエンドポイントを簡単に作成する方法を学びます。",
+        },
+        {
+          id: 100,
+          part: 4,
+          name: "Next.js API Routesによるコンタクトフォーム (フロントエンド連携)",
+          difficulty: "上級",
+          focus: "フルスタックReact",
+          concepts: "API Fetching from Frontend",
+          hint: "Reactのフォームコンポーネントから、`fetch`を使って`/api/contact`エンドポイントにPOSTリクエストを送ります。リクエストボディにフォームデータを含めます。",
+          learn:
+            "Next.jsアプリケーション内で、自作したAPIエンドポイントをフロントエンドから呼び出す方法を学び、フルスタックな開発サイクルを完結させます。",
+        },
+      ];
+
+      const partDescriptions = {
+        1: {
+          title: "Part 1: 基礎の構築",
+          description:
+            "Reactのコア機能（JSX、コンポーネント、props、state）の「マッスルメモリー」を構築します。すべての基本となる最も重要なフェーズです。",
+        },
+        2: {
+          title: "Part 2: 外部世界との連携",
+          description:
+            "外部APIと対話し、データを取得・操作する方法を学びます。`useEffect`フックをマスターし、非同期処理を扱います。",
+        },
+        3: {
+          title: "Part 3: スケーラブルなアプリケーションの構築",
+          description:
+            "アプリケーションの規模が大きくなる際の「ナビゲーション」と「状態管理」の課題に取り組みます。React Routerや状態管理ライブラリを学びます。",
+        },
+        4: {
+          title: "Part 4: プロフェッショナルな仕上げ",
+          description:
+            "パフォーマンス最適化、コード品質、TypeScriptによる型安全性の導入、Next.jsフレームワークなど、より高度で専門的なトピックを探求します。",
+        },
+      };
+
+      const projectGrid = document.getElementById("project-grid");
+      const difficultyFilter = document.getElementById("difficulty-filter");
+      const searchInput = document.getElementById("search-input");
+      const mainNav = document.getElementById("main-nav");
+      const navLinks = mainNav.querySelectorAll(".nav-link");
+      const partDescriptionEl = document.getElementById("part-description");
+      const modal = document.getElementById("modal");
+      const modalContent = document.getElementById("modal-content");
+
+      let state = {
+        currentPart: 1,
+        difficulty: "all",
+        searchTerm: "",
+        completed: JSON.parse(localStorage.getItem("completedProjects")) || [],
+      };
+
+      function saveState() {
+        localStorage.setItem(
+          "completedProjects",
+          JSON.stringify(state.completed)
+        );
+      }
+
+      const difficultyColors = {
+        初級: "bg-green-100 text-green-800",
+        中級: "bg-yellow-100 text-yellow-800",
+        上級: "bg-red-100 text-red-800",
+      };
+
+      function renderProjects() {
+        let filteredProjects = projects.filter((p) => {
+          const partMatch = p.part === state.currentPart;
+          const difficultyMatch =
+            state.difficulty === "all" || p.difficulty === state.difficulty;
+          const searchMatch =
+            state.searchTerm === "" ||
+            p.name.toLowerCase().includes(state.searchTerm) ||
+            p.concepts.toLowerCase().includes(state.searchTerm);
+          return partMatch && difficultyMatch && searchMatch;
+        });
+
+        projectGrid.innerHTML = "";
+        if (filteredProjects.length === 0) {
+          projectGrid.innerHTML = `<p class="text-gray-500 md:col-span-2 lg:col-span-3 xl:col-span-4 text-center">該当するプロジェクトはありません。</p>`;
+        } else {
+          filteredProjects.forEach((p) => {
+            const isCompleted = state.completed.includes(p.id);
+            const card = document.createElement("div");
+            card.className = `project-card bg-white rounded-lg shadow-sm p-4 flex flex-col justify-between cursor-pointer border-l-4 border-transparent ${
+              isCompleted ? "completed" : ""
+            }`;
+            card.dataset.id = p.id;
+
+            card.innerHTML = `
+                    <div>
+                        <div class="flex justify-between items-start">
+                            <span class="text-xs font-bold ${
+                              difficultyColors[p.difficulty]
+                            } px-2 py-1 rounded-full">${p.difficulty}</span>
+                            <span class="text-2xl font-bold text-gray-200">${
+                              p.id
+                            }</span>
+                        </div>
+                        <h4 class="font-bold mt-2 mb-1 text-gray-800">${
+                          p.name
+                        }</h4>
+                        <p class="text-xs text-gray-500">${p.focus}</p>
+                    </div>
+                    <div class="text-right mt-4">
+                        <span class="text-teal-600 text-2xl">${
+                          isCompleted ? "&#10004;" : ""
+                        }</span>
+                    </div>
+                `;
+            projectGrid.appendChild(card);
+          });
+        }
+      }
+
+      function updateActiveNav() {
+        navLinks.forEach((link) => {
+          if (parseInt(link.dataset.part) === state.currentPart) {
+            link.classList.add("active");
+          } else {
+            link.classList.remove("active");
+          }
+        });
+
+        const descriptionData = partDescriptions[state.currentPart];
+        partDescriptionEl.innerHTML = `
+            <h3 class="font-bold text-lg">${descriptionData.title}</h3>
+            <p class="text-sm">${descriptionData.description}</p>
+        `;
+      }
+
+      function handleFilterChange() {
+        state.difficulty = difficultyFilter.value;
+        renderProjects();
+      }
+
+      function handleSearch() {
+        state.searchTerm = searchInput.value.toLowerCase();
+        renderProjects();
+      }
+
+      function handleNavClick(e) {
+        e.preventDefault();
+        if (e.target.tagName === "A") {
+          state.currentPart = parseInt(e.target.dataset.part);
+          updateActiveNav();
+          renderProjects();
+        }
+      }
+
+      function openModal(projectId) {
+        const project = projects.find((p) => p.id === projectId);
+        if (!project) return;
+
+        const isCompleted = state.completed.includes(project.id);
+
+        modalContent.innerHTML = `
+            <div class="p-6 md:p-8">
+                <div class="flex justify-between items-center mb-4">
+                    <span class="text-sm font-bold ${
+                      difficultyColors[project.difficulty]
+                    } px-3 py-1 rounded-full">${project.difficulty}</span>
+                    <button id="close-modal-btn" class="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
+                </div>
+                <h2 class="text-2xl md:text-3xl font-bold text-gray-800 mb-2">${
+                  project.name
+                }</h2>
+                <p class="text-sm text-gray-500 mb-4"><strong>主要コンセプト:</strong> ${
+                  project.concepts
+                }</p>
+                
+                <div class="space-y-6 mt-6">
+                    <div>
+                        <h4 class="font-bold text-lg text-teal-700 mb-2 border-b-2 border-teal-200 pb-1">製造のヒント</h4>
+                        <p class="text-gray-600 leading-relaxed">${
+                          project.hint
+                        }</p>
+                    </div>
+                    <div>
+                        <h4 class="font-bold text-lg text-teal-700 mb-2 border-b-2 border-teal-200 pb-1">学習の詳細</h4>
+                        <p class="text-gray-600 leading-relaxed">${
+                          project.learn
+                        }</p>
+                    </div>
+                </div>
+
+                <!-- AI Assistant Section -->
+                <div class="mt-8 pt-6 border-t border-gray-200">
+                    <h4 class="font-bold text-lg text-teal-700 mb-2 flex items-center">
+                        <span class="text-xl mr-2">✨</span>
+                        AI学習アシスタント
+                    </h4>
+                    <p class="text-sm text-gray-600 mb-4">行き詰まったらAIに相談してみましょう。プロジェクトの進め方やコンセプトについて、具体的なアドバイスをもらえます。</p>
+                    <div class="flex flex-wrap gap-2">
+                        <button id="ai-breakdown-btn" data-project-id="${
+                          project.id
+                        }" class="flex-1 bg-teal-50 text-teal-700 hover:bg-teal-100 text-sm font-semibold px-4 py-2 rounded-lg transition-colors">プロジェクトを分解する</button>
+                        <button id="ai-deepdive-btn" data-project-id="${
+                          project.id
+                        }" class="flex-1 bg-teal-50 text-teal-700 hover:bg-teal-100 text-sm font-semibold px-4 py-2 rounded-lg transition-colors">コンセプトを深掘り</button>
+                    </div>
+                    <div id="ai-response-container" class="mt-4 p-4 bg-gray-50 rounded-lg hidden">
+                        <div id="ai-loader" class="text-center hidden">
+                            <div class="flex justify-center items-center">
+                                <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-teal-600"></div>
+                                <p class="ml-3 text-gray-600">AIが考えています...</p>
+                            </div>
+                        </div>
+                        <div id="ai-response-content" class="ai-response text-gray-700 text-sm space-y-2"></div>
+                    </div>
+                </div>
+                
+                <div class="mt-8 text-right">
+                    <button id="toggle-complete-btn" data-id="${
+                      project.id
+                    }" class="px-6 py-2 rounded-lg font-semibold text-white ${
+          isCompleted
+            ? "bg-gray-400 hover:bg-gray-500"
+            : "bg-teal-600 hover:bg-teal-700"
+        }">
+                        ${isCompleted ? "未完了に戻す" : "完了済みにする"}
+                    </button>
+                </div>
+            </div>
+        `;
+
+        modal.classList.remove("opacity-0", "pointer-events-none");
+        modalContent.classList.remove("scale-95");
+
+        document
+          .getElementById("close-modal-btn")
+          .addEventListener("click", closeModal);
+        modal.addEventListener("click", (e) => {
+          if (e.target === modal) closeModal();
+        });
+        document
+          .getElementById("toggle-complete-btn")
+          .addEventListener("click", handleToggleComplete);
+        document
+          .getElementById("ai-breakdown-btn")
+          .addEventListener("click", handleAiRequest);
+        document
+          .getElementById("ai-deepdive-btn")
+          .addEventListener("click", handleAiRequest);
+      }
+
+      function closeModal() {
+        modal.classList.add("opacity-0", "pointer-events-none");
+        modalContent.classList.add("scale-95");
+      }
+
+      function handleToggleComplete(e) {
+        const projectId = parseInt(e.target.dataset.id);
+        const index = state.completed.indexOf(projectId);
+        if (index > -1) {
+          state.completed.splice(index, 1);
+        } else {
+          state.completed.push(projectId);
+        }
+        saveState();
+        renderProjects();
+        closeModal();
+      }
+
+      // public/index.html の <script>タグ内
+
+      async function handleAiRequest(e) {
+        const button = e.currentTarget;
+        const projectId = parseInt(button.dataset.projectId);
+        const project = projects.find((p) => p.id === projectId);
+        const type =
+          button.id === "ai-breakdown-btn" ? "breakdown" : "deepdive";
+
+        if (!project) return;
+
+        let prompt;
+        if (type === "breakdown") {
+          prompt = `あなたはReactのエキスパートなメンターです。React初学者のために、以下のプロジェクトを達成するための具体的なステップを、簡潔な箇条書きで提案してください。\n\nプロジェクト名: 「${project.name}」\n主要なフォーカス: ${project.focus}`;
+        } else {
+          prompt = `あなたはReactのエキスパートなメンターです。React初学者のために、以下の技術的なコンセプトについて、簡単なコード例を交えながら分かりやすく解説してください。\n\nコンセプト: ${project.concepts}`;
+        }
+
+        const responseContainer = document.getElementById(
+          "ai-response-container"
+        );
+        const loader = document.getElementById("ai-loader");
+        const content = document.getElementById("ai-response-content");
+
+        responseContainer.classList.remove("hidden");
+        loader.classList.remove("hidden");
+        content.innerHTML = "";
+
+        try {
+          // ★★★ 修正箇所：呼び出し先をGoogleのAPIから、自分たちのバックエンドAPIに変更 ★★★
+          const apiUrl = "/api/gemini";
+          const payload = { prompt }; // バックエンドにプロンプトを渡す
+
+          const response = await fetch(apiUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload), // APIキーは含めない！
+          });
+
+          const result = await response.json();
+
+          if (!response.ok) {
+            // バックエンドからのエラーメッセージを表示
+            throw new Error(
+              result.message || `API Error: ${response.statusText}`
+            );
+          }
+
+          if (result.candidates && result.candidates.length > 0) {
+            const text = result.candidates[0].content.parts[0].text;
+            content.innerHTML = formatAiResponse(text);
+          } else {
+            // APIからのレスポンス形式が予期しないものだった場合
+            content.innerHTML =
+              '<p class="text-red-600">AIから有効な応答がありませんでした。形式が正しくない可能性があります。</p>';
+            console.log("Unexpected response from AI:", result);
+          }
+        } catch (error) {
+          console.error("API call failed:", error);
+          content.innerHTML = `<p class="text-red-600">AIアシスタントの呼び出し中にエラーが発生しました： ${error.message}</p>`;
+        } finally {
+          loader.classList.add("hidden");
+        }
+      }
+
+      function formatAiResponse(text) {
+        return text
+          .replace(/```javascript\b/g, "<pre><code>")
+          .replace(/```/g, "</code></pre>")
+          .split("\n")
+          .map((line) => {
+            line = line.trim();
+            if (line.startsWith("* ")) {
+              return `<ul><li class="ml-4 list-disc">${line.substring(
+                2
+              )}</li></ul>`;
+            }
+            if (/^\d+\.\s/.test(line)) {
+              return `<ol><li class="ml-4 list-decimal">${line.replace(
+                /^\d+\.\s/,
+                ""
+              )}</li></ol>`;
+            }
+            if (line.length > 0) {
+              return `<p>${line}</p>`;
+            }
+            return "";
+          })
+          .join("")
+          .replace(/<\/ul><ul>/g, "")
+          .replace(/<\/ol><ol>/g, "");
+      }
+
+      projectGrid.addEventListener("click", (e) => {
+        const card = e.target.closest(".project-card");
+        if (card) {
+          openModal(parseInt(card.dataset.id));
+        }
+      });
+
+      // Charting
+      function initCharts() {
+        const difficultyCounts = projects.reduce((acc, p) => {
+          acc[p.difficulty] = (acc[p.difficulty] || 0) + 1;
+          return acc;
+        }, {});
+
+        const partCounts = projects.reduce((acc, p) => {
+          acc[p.part] = (acc[p.part] || 0) + 1;
+          return acc;
+        }, {});
+
+        const difficultyChartCtx = document
+          .getElementById("difficultyChart")
+          .getContext("2d");
+        new Chart(difficultyChartCtx, {
+          type: "doughnut",
+          data: {
+            labels: Object.keys(difficultyCounts),
+            datasets: [
+              {
+                data: Object.values(difficultyCounts),
+                backgroundColor: ["#d1fae5", "#fef3c7", "#fee2e2"],
+                borderColor: ["#10b981", "#f59e0b", "#ef4444"],
+                borderWidth: 1,
+              },
+            ],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { position: "top" },
+            },
+          },
+        });
+
+        const partChartCtx = document
+          .getElementById("partChart")
+          .getContext("2d");
+        new Chart(partChartCtx, {
+          type: "bar",
+          data: {
+            labels: Object.keys(partCounts).map((p) => `Part ${p}`),
+            datasets: [
+              {
+                label: "プロジェクト数",
+                data: Object.values(partCounts),
+                backgroundColor: "#5eead4",
+                borderColor: "#0d9488",
+                borderWidth: 1,
+              },
+            ],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: { y: { beginAtZero: true } },
+            plugins: { legend: { display: false } },
+          },
+        });
+      }
+
+      // Initial setup
+      mainNav.addEventListener("click", handleNavClick);
+      difficultyFilter.addEventListener("change", handleFilterChange);
+      searchInput.addEventListener("input", handleSearch);
+
+      updateActiveNav();
+      renderProjects();
+      initCharts();
+    </script>
+  </body>
+</html>
